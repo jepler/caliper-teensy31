@@ -54,7 +54,7 @@ and for inches there are always 4 decimal places (e.g., 3.9995).
 The position is also transmitted continuously on serial.  You can use this for whatever purpose you imagine.
 There's an included DRO program written in Tcl/TK.
 It will show the caliper readout in the upper right of the screen, timing out after the caliper position has been stable for 4s.
-If you have tcl/tk installed, then you can launch the DRO with `wish dro.tcl`.
+If you have tcl/tk installed, then you can launch the DRO with `wish dro.tcl `_`comport`_ (e.g., `wish dro.tcl /dev/ttyACM0` on my Linux machine).
 
 # If it doesn't work
 If no data is read, the paste key will type "NO DATA" once per power on.
