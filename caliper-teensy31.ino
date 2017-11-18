@@ -19,9 +19,11 @@ constexpr auto PIN_V1_5 = A14;
 constexpr auto PIN_nCLK = 14;
 constexpr auto PIN_nDATA = 11;
 constexpr auto PIN_nACT = 12;
-constexpr auto PIN_DBG = 15;
+constexpr auto PIN_LED = 13;
 constexpr auto DAC_SETTING_V1_5 = int(1.5 * 4096 / 3.3 + .5);
-char buf[32];
+char buf[81];
+
+static_assert(sizeof(1ull) == 8, "unsigned long long is 64 bits");
 
 void setup() {
   Serial.begin(9600); 
@@ -29,21 +31,20 @@ void setup() {
   pinMode(PIN_nCLK, INPUT_PULLUP);
   pinMode(PIN_nDATA, INPUT_PULLUP);
   pinMode(PIN_nACT, INPUT_PULLUP);
-  pinMode(PIN_DBG, OUTPUT);
+  pinMode(PIN_LED, OUTPUT);
   analogWrite(PIN_V1_5, DAC_SETTING_V1_5);
-  // put your setup code here, to run once:
   snprintf(buf, sizeof(buf), "no data");
 }
 
+// (I don't use an enum because of a deficiency in arduino's handling of enums: https://playground.arduino.cc/Code/Enum)
 #define STATE_WAIT_IDLE (0)
 #define STATE_WAIT_LOW (1)
 #define STATE_WAIT_HIGH (2)
 
-uint8_t state = STATE_WAIT_IDLE;
-uint64_t reading;
-uint8_t bitno;
-uint8_t clk, data;
+uint8_t state, bitno;
+bool clk, data, stable;
 uint16_t time_idle;
+uint64_t reading, old_reading;
 
 uint8_t wait_idle() {
   if (!clk)
@@ -65,33 +66,20 @@ uint8_t wait_high() {
 }
 
 
-uint64_t old_reading;
-int j;
-static_assert(sizeof(1ull) == 8, "unsigned long long is 64 bits");
 uint8_t wait_low() {
   if (clk) return STATE_WAIT_LOW;
   if (!data) reading = reading | (1ull << bitno); // (data << bitno);
   
-  #ifdef USB_SERIAL
-//  if(bitno == j) {
-//    Serial.print(!data);
-//  }
-  #endif
-bitno ++;
+  bitno ++;
   if (bitno == 48) {
-//    j++;
-//    if(j == 48) { j = 0; Serial.print('\n'); }
-    auto stable = (reading == old_reading);
+    stable = (reading == old_reading);
     old_reading = reading;
-    if(!stable) return STATE_WAIT_IDLE;
     auto position = (reading & 0xfffffull);
     auto signbit = bool(reading & 0x100000ull);
     auto inch = bool(reading & (1ull << 47));
-#define DO_DEBUG 0
-#if DO_DEBUG
-    snprintf(buf, sizeof(buf), "%12llx %d %d %d\n", 
-        reading, (int)position, (int)signbit, (int)inch);
-#else    
+
+    digitalWrite(PIN_LED, stable);
+    
     if (inch) {
       snprintf(buf, sizeof(buf), " %s%d.%03d%c",
              signbit ? "-" : "",
@@ -104,7 +92,9 @@ bitno ++;
              (int)(position / 100),
              (int)(position % 100));
     }
-#endif
+    Serial.write(buf);
+    Serial.write("\n");
+
     return STATE_WAIT_IDLE;
   }
   return STATE_WAIT_HIGH;
@@ -114,27 +104,20 @@ bool old_act;
 
 void loop() {
   bool act = !digitalRead(PIN_nACT);
-  if (act && !old_act) {
-    #ifdef USB_HID
+  if (act && !old_act && stable) {
     Keyboard.write(buf);
-    #else
-    Serial.write(buf);
-    #endif
     *buf = 0;
-    delay(300);
+    old_reading = ~0;
+    stable = false; // this ends up acting like a debounce
+    digitalWrite(PIN_LED, false);
   }
   old_act = act;
-  clk = !!digitalRead(PIN_nCLK);
-  data = !!digitalRead(PIN_nDATA);
+  clk = digitalRead(PIN_nCLK);
+  data = digitalRead(PIN_nDATA);
 
-  digitalWrite(PIN_DBG, time_idle & 1);
   switch (state) {
     case STATE_WAIT_IDLE: state = wait_idle(); break;
     case STATE_WAIT_LOW:  state = wait_low(); break;
     case STATE_WAIT_HIGH: state = wait_high(); break;
   }
-  //digitalWrite(PIN_DBG, 0);
-  ///if(state != STATE_WAIT_IDLE) goto again;
-  //if(bitno >= 24) { Serial.print((int)bitno); Serial.print("! "); Serial.println(state); }
-  //    Serial.print(state); Serial.print(" "); Serial.print(bitno); Serial.print("\n");
 }
