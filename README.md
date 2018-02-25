@@ -12,6 +12,7 @@ If you use a different board you'll need to make different arrangements.
 1. Configure Arduino for USB Serial+Keyboard.
 1. Upload the sketch
 1. Verify that pin "A13" generates 1.5V with respect to GND.  If it doesn't, and you continue to follow these instructions, you'll fry the caliper.
+1. Verify that pins "11" and "23" are floating.
 
 # Hookup
 1. Remove the battery from the caliper.
@@ -29,14 +30,15 @@ If you use a different board you'll need to make different arrangements.
 1. Connect GND to Teensy GND and 1.5V to pin A13 **after re-verifying that pin A13 has 1.5V with respect to GND**.
   If you like, you can add a moderate-value capacitor to the 1.5V rail, but I didn't experience any problems without it.
   Now, when Teensy is powered, the caliper should function.
-1. For Clock and Data, make a [1-transistor inverter](https://en.wikipedia.org/wiki/Inverter_(logic_gate)#/media/File:Transistor_pegelumsetzer.svg).
-  The Teensy enables an internal pull-up, so only the base resistor and transistor are needed. 
-  A 10k base resistor works fine, but if I were doing it again I'd try with 47k or 100k,
-  because with 10k the base current of the two transistors is 10x the current consumption of the unmodified caliper.
-  However, since you aren't powering this from battery, the only worry is whether this damages the caliper electronics themselves.
-  So far (days of power-on time) it hasn't, which is unsurprising because while "10x" sounds like a lot it's still just microwatts.
-1. Connect inverted clock to Teensy pin 14, and inverted ata to Teensy pin 11.
-  Either of these pins can be changed in the source code
+1. Connect DATA to Teensy pin 23 and CLOCK to Teensy pin 11.
+  These pins are used in "analog comparator" mode, with a threshold of .67v,
+  making level translators unnecessary.
+  (By editing the source code, it is possible to make alternate pin assignments,
+  but only certain pins can be used as analog pin comparators
+  and no effort has been made to make this easy to do.
+  Refer to the Kinesis K20P64M72SF1RM manual, section 10.3.1, for pin assignments.
+  DATA and CLOCK pins could potentially be assigne to any CMPx\_INy pins,
+  as long as "x" is different for each signal.)
 1. Connect a NO button to Teensy pin 12 and GND.
   This pin can also be changed in the source code.
   I have considered installing the button in the empty battery compartment or otherwise permanently on the caliper.

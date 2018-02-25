@@ -16,8 +16,6 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 constexpr auto PIN_V1_5 = A14;
-constexpr auto PIN_nCLK = 14;
-constexpr auto PIN_nDATA = 11;
 constexpr auto PIN_nACT = 12;
 constexpr auto PIN_LED = 13;
 constexpr auto DAC_SETTING_V1_5 = int(1.5 * 4096 / 3.3 + .5);
@@ -28,12 +26,38 @@ static_assert(sizeof(1ull) == 8, "unsigned long long is 64 bits");
 void setup() {
   Serial.begin(9600); 
   analogWriteResolution(12);
-  pinMode(PIN_nCLK, INPUT_PULLUP);
-  pinMode(PIN_nDATA, INPUT_PULLUP);
   pinMode(PIN_nACT, INPUT_PULLUP);
   pinMode(PIN_LED, OUTPUT);
   analogWrite(PIN_V1_5, DAC_SETTING_V1_5);
   snprintf(buf, sizeof(buf), "no data");
+
+// Set up the analog comparators to read the low-voltage signals.
+//
+// Unfortunately, analog comparators aren't standardized by the Arduino library,
+// or by any third-party library I ran across, so we're going to go directly
+// down to the register level for this.
+  SIM_SCGC4 |= SIM_SCGC4_CMP; // enable clock to comparator module
+
+// CMP1 (data pin)
+  CMP1_CR0 = CMP_CR0_FILTER_CNT(1) | CMP_CR0_HYSTCTR(1);
+  CMP1_CR1 = CMP_CR1_INV | CMP_CR1_EN;
+  CMP1_MUXCR = CMP_MUXCR_PSEL(0) | CMP_MUXCR_MSEL(7);
+// set DAC1 ref to code 14, since 3.3v * 14/64 = .67v
+  CMP1_DACCR = CMP_DACCR_DACEN | CMP_DACCR_VRSEL | CMP_DACCR_VOSEL(14);
+
+// CMP0 (clock pin)
+  CMP0_CR0 = CMP_CR0_FILTER_CNT(1) | CMP_CR0_HYSTCTR(1);
+  CMP0_CR1 = CMP_CR1_INV | CMP_CR1_EN;
+  CMP0_MUXCR = CMP_MUXCR_PSEL(0) | CMP_MUXCR_MSEL(7);
+// set DAC0 ref to code 14, since 3.3v * 14/64 = .67v
+  CMP0_DACCR = CMP_DACCR_DACEN | CMP_DACCR_VRSEL | CMP_DACCR_VOSEL(14);
+
+// For other pin assignment possibilities, see the reference manual
+// https://cache.freescale.com/files/32bit/doc/ref_manual/K20P64M72SF1RM.pdf
+// 3.7.2.1 (page 105) for internal connections to the analog comparator,
+// and 10.3.1 (page 207ff) for external pin assignments.  Remember that
+// each signal needs to go to a different CMPx comparator (e.g., CMP0 and CMP1,
+// CMP1 and CMP2, or CMP0 and CMP2)
 }
 
 // (I don't use an enum because of a deficiency in arduino's handling of enums: https://playground.arduino.cc/Code/Enum)
@@ -112,8 +136,8 @@ void loop() {
     digitalWrite(PIN_LED, false);
   }
   old_act = act;
-  clk = digitalRead(PIN_nCLK);
-  data = digitalRead(PIN_nDATA);
+  clk = !!(CMP0_SCR & CMP_SCR_COUT);
+  data = !!(CMP1_SCR & CMP_SCR_COUT);
 
   switch (state) {
     case STATE_WAIT_IDLE: state = wait_idle(); break;
