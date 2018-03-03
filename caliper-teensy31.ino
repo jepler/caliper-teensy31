@@ -15,22 +15,23 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+
+#if defined(__MK20DX256__) && defined(TEENSYDUINO) && TEENSYDUINO == 140
+// internet lore says that ARDUINO_BOARD_TEENSY31 should have been defined, but
+// not for me (in arduino 1.8.5)!
+#define TEENSY32
+#endif
+
+#if defined(TEENSY32)
+// note: actually only works with Teensy 3.2, DAC wasn't exposed on 3.1
+// but this case will be selected anyway :-/
 constexpr auto PIN_V1_5 = A14;
 constexpr auto PIN_nACT = 12;
 constexpr auto PIN_LED = 13;
 constexpr auto DAC_SETTING_V1_5 = int(1.5 * 4096 / 3.3 + .5);
-char buf[81];
-
-static_assert(sizeof(1ull) == 8, "unsigned long long is 64 bits");
-
-void setup() {
-  Serial.begin(9600); 
-  analogWriteResolution(12);
-  pinMode(PIN_nACT, INPUT_PULLUP);
-  pinMode(PIN_LED, OUTPUT);
-  analogWrite(PIN_V1_5, DAC_SETTING_V1_5);
-  snprintf(buf, sizeof(buf), "no data");
-
+bool read_clk() { return !!(CMP0_SCR & CMP_SCR_COUT); }
+bool read_data() { return !!(CMP1_SCR & CMP_SCR_COUT); }
+void board_setup() {
 // Set up the analog comparators to read the low-voltage signals.
 //
 // Unfortunately, analog comparators aren't standardized by the Arduino library,
@@ -51,13 +52,30 @@ void setup() {
   CMP0_MUXCR = CMP_MUXCR_PSEL(0) | CMP_MUXCR_MSEL(7);
 // set DAC0 ref to code 14, since 3.3v * 14/64 = .67v
   CMP0_DACCR = CMP_DACCR_DACEN | CMP_DACCR_VRSEL | CMP_DACCR_VOSEL(14);
-
 // For other pin assignment possibilities, see the reference manual
 // https://cache.freescale.com/files/32bit/doc/ref_manual/K20P64M72SF1RM.pdf
 // 3.7.2.1 (page 105) for internal connections to the analog comparator,
 // and 10.3.1 (page 207ff) for external pin assignments.  Remember that
 // each signal needs to go to a different CMPx comparator (e.g., CMP0 and CMP1,
 // CMP1 and CMP2, or CMP0 and CMP2)
+}
+#else
+#error "need to define a board type macro (or your board is not supported)"
+#endif
+
+char buf[81];
+
+static_assert(sizeof(1ull) == 8, "unsigned long long is 64 bits");
+
+void setup() {
+  Serial.begin(9600);
+  analogWriteResolution(12);
+  pinMode(PIN_nACT, INPUT_PULLUP);
+  pinMode(PIN_LED, OUTPUT);
+  analogWrite(PIN_V1_5, DAC_SETTING_V1_5);
+  snprintf(buf, sizeof(buf), "no data");
+  board_setup();
+
 }
 
 // (I don't use an enum because of a deficiency in arduino's handling of enums: https://playground.arduino.cc/Code/Enum)
@@ -136,8 +154,8 @@ void loop() {
     digitalWrite(PIN_LED, false);
   }
   old_act = act;
-  clk = !!(CMP0_SCR & CMP_SCR_COUT);
-  data = !!(CMP1_SCR & CMP_SCR_COUT);
+  clk = read_clk();
+  data = read_data();
 
   switch (state) {
     case STATE_WAIT_IDLE: state = wait_idle(); break;
