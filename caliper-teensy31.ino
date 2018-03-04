@@ -62,6 +62,52 @@ void board_setup() {
 void keyboard_write(const char *buf) {
     Keyboard.write(buf);
 }
+#elif defined(ARDUINO_TRINKET_M0)
+#warning "this is only aspirational support for now"
+constexpr auto PIN_V1_5 = A0;
+constexpr auto DAC_SETTING_V1_5 = int(1.5 * 4096 / 3.3 + .5);
+constexpr auto PIN_nACT = 12;
+// PIN_LED is predefined
+bool read_clk() { return !(REG_AC_STATUSA & 1); }
+bool read_data() { return !(REG_AC_STATUSA & 2); }
+void board_setup() {
+    // enable APB clock to the analog comparator
+    REG_PM_APBCMASK |= PM_APBCMASK_AC;
+
+    // Enable GCLK0 to comparator digital section
+    REG_GCLK_CLKCTRL = GCLK_CLKCTRL_CLKEN |
+        GCLK_CLKCTRL_GEN_GCLK0 |
+        GCLK_CLKCTRL_ID_AC_DIG;
+
+    // Enable GCLK0 to comparator analog section
+    REG_GCLK_CLKCTRL = GCLK_CLKCTRL_CLKEN |
+        GCLK_CLKCTRL_GEN_GCLK0 |
+        GCLK_CLKCTRL_ID_AC_ANA;
+
+    // Enable AC
+    REG_AC_CTRLA |= AC_CTRLA_ENABLE;
+// https://cdn.sparkfun.com/datasheets/Dev/Arduino/Boards/Atmel-42181-SAM-D21_Datasheet.pdf page 21
+
+// AC IN[2] is SAMD21E package pin 7 (clk pin), labeled "4"
+    REG_AC_COMPCTRL0 =
+        AC_COMPCTRL_FLEN_MAJ5 |
+        AC_COMPCTRL_HYST |
+        AC_COMPCTRL_MUXPOS(2) |
+        AC_COMPCTRL_MUXNEG(5) |
+        AC_COMPCTRL_ENABLE;
+
+    REG_AC_SCALER0 = 14;
+// AC IN[3] is SAMD21E package pin 8 (data pin), labeled "3"
+    REG_AC_COMPCTRL1 =
+        AC_COMPCTRL_FLEN_MAJ5 |
+        AC_COMPCTRL_HYST |
+        AC_COMPCTRL_MUXPOS(3) |
+        AC_COMPCTRL_MUXNEG(5) |
+        AC_COMPCTRL_ENABLE;
+
+    REG_AC_SCALER1 = 14;
+ }
+void keyboard_write(const char *buf) {}
 #else
 #error "need to define a board type macro (or your board is not supported)"
 #endif
