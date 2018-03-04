@@ -1,13 +1,22 @@
-# caliper-teensy31
-USB HID driver for Harbor Freight 100mm Electronic Digital Caliper
+# caliper-teensy31 - USB Serial and HID driver for Harbor Freight 100mm Electronic Digital Caliper
 
 Note: There are many different types of Electronic Digital Caliper.
 This software is for the kind which sends a 48-bit, binary encoded packet.
 
-# Install the software
-This is designed and tested on a Teensy 3.1 using the Arduino development environment.
-It is probably adaptable to other Arduino-supported boards, but one important feature of the Teensy is that it has a true DAC which is used to generate the 1.5V supply for the caliper.
+This is designed and tested on a Teensy 3.2 using the Arduino development environment.
+It's also tested on an Adafruit Trinket M0 without USB HID support, see below.
+(Despite the repository name, it's not designed to work with Teensy 3.1, which lacks the needed DAC pin)
+
+It is probably adaptable to other Arduino-supported boards, but the presence of a true DAC (to supply 1.5v to the calipers)
+and multiple independent analog comparators (to read the low voltage signals as digital inputs)
+are key to having a simple design without any external components.
 If you use a different board you'll need to make different arrangements.
+(for instance, I started with a resistive divider and one-transistor inverters,
+like many others who have also done similar project)
+
+# Install the software
+
+(pin numbers in the main text are for Teensy 3.2; see below for pin numbering on Trinket M0)
 
 1. Configure Arduino for USB Serial+Keyboard.
 1. Upload the sketch
@@ -62,3 +71,14 @@ If you have tcl/tk installed, then you can launch the DRO with `wish dro.tcl `_`
 If no data is read, the paste key will type "NO DATA" once per power on.
 This could mean that your caliper is incompatible, or that something's wrong with the connection circuit.
 I don't have any specific troubleshooting guidance.
+
+(If things that look like powers of two are output, like 655.36mm, then data and clk are switched)
+
+# Adafruit Triket M0
+
+This board also works, though at the moment it only has simulated serial for use with dro.tcl, not USB HID to type in the values measured.
+Follow these alternate pin assignments:
+
+- pin 1: 1.5v output
+- pin 3: data input
+- pin 4: clk input
