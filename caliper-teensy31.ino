@@ -59,6 +59,9 @@ void board_setup() {
 // each signal needs to go to a different CMPx comparator (e.g., CMP0 and CMP1,
 // CMP1 and CMP2, or CMP0 and CMP2)
 }
+void keyboard_write(const char *buf) {
+    Keyboard.write(buf);
+}
 #else
 #error "need to define a board type macro (or your board is not supported)"
 #endif
@@ -147,7 +150,7 @@ bool old_act;
 void loop() {
   bool act = !digitalRead(PIN_nACT);
   if (act && !old_act && stable) {
-    Keyboard.write(buf);
+    keyboard_write(buf);
     *buf = 0;
     old_reading = ~0;
     stable = false; // this ends up acting like a debounce
